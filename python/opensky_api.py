@@ -262,17 +262,32 @@ class OpenSkyApi(object):
     Main class of the OpenSky Network API. Instances retrieve data from OpenSky via HTTP.
     """
 
-    def __init__(self, username=None, password=None):
+    def __init__(self, secret_id=None, secret_key=None):
         """Create an instance of the API client. If you do not provide username and password requests will be
         anonymous which imposes some limitations.
 
         :param str username: an OpenSky username (optional).
         :param str password: an OpenSky password for the given username (optional).
         """
-        if username is not None:
-            self._auth = (username, password)
-        else:
-            self._auth = ()
+        if secret_id  and secret_key :
+            payload = {
+                "grant_type": "client_credentials",
+                "client_id": secret_id,
+                "client_secret": secret_key,
+            }
+            response = requests.post(
+                "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token", data=payload
+            )
+            if response.status_code == 200:
+                token_info = response.json()
+                token = token_info["access_token"]
+            else:
+                raise Exception(
+                    f"❌ Impossible d'obtenir le token : {response.status_code} {response.text}"
+                )
+            self._auth = (secret_id, token)
+            self._token = token
+
         self._api_url = "https://opensky-network.org/api"
         self._last_requests = defaultdict(lambda: 0)
 
@@ -287,9 +302,9 @@ class OpenSkyApi(object):
         """
         r = requests.get(
             "{0:s}{1:s}".format(self._api_url, url_post),
-            auth=self._auth,
             params=params,
             timeout=15.00,
+            headers={"Authorization": f"Bearer {self._token}"} if hasattr(self, "_token") else {},
         )
         if r.status_code == 200:
             self._last_requests[callee] = time.time()
