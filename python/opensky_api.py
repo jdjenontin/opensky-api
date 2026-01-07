@@ -257,6 +257,10 @@ class FlightTrack(object):
         return pprint.pformat(self.__dict__, indent=4)
 
 
+
+class RateLimitError(Exception):
+    """Exception raised when rate limit is exceeded."""
+    pass
 class OpenSkyApi(object):
     """
     Main class of the OpenSky Network API. Instances retrieve data from OpenSky via HTTP.
@@ -309,6 +313,9 @@ class OpenSkyApi(object):
         if r.status_code == 200:
             self._last_requests[callee] = time.time()
             return r.json()
+        if r.status_code == 429:
+            logger.error("Rate limit exceeded!")
+            raise RateLimitError("Rate limit exceeded!")
         else:
             logger.debug(
                 "Response not OK. Status {0:d} - {1:s}".format(r.status_code, r.reason)
